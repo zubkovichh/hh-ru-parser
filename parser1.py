@@ -5,7 +5,7 @@ from typing import List, Dict, Optional
 import logging
 from dataclasses import dataclass, asdict
 
-# Настройка логирования
+# Logging setup
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -13,7 +13,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Даталогика (структура данных вакансии)
+# Data structure for a vacancy
 @dataclass
 class Vacancy:
     title: str
@@ -30,42 +30,41 @@ class HHruParser:
         "Accept": "application/json",
     }
 
-    def __init__(self, search_query: str = "Python разработчик", max_pages: int = 3):
+    def __init__(self, search_query: str = "Python developer", max_pages: int = 3):
         self.search_query = search_query
         self.max_pages = max_pages
         self.found_vacancies: List[Vacancy] = []
 
     def fetch_vacancies(self) -> None:
-        """Основной метод для получения вакансий."""
+        """Main method to fetch vacancies from hh.ru"""
         for page in range(self.max_pages):
             try:
                 params = {
                     "text": self.search_query,
                     "page": page,
-                    "per_page": 50,  # Максимум на странице
-                    "area": 1,  # Москва (1)
+                    "per_page": 50,
+                    "area": 1,  # Moscow
                 }
                 response = requests.get(self.BASE_URL, headers=self.HEADERS, params=params, timeout=10)
-                response.raise_for_status()  # Проверка на 4xx/5xx ошибки
+                response.raise_for_status()
                 data = response.json()
 
                 if not data.get("items"):
-                    logger.warning(f"На странице {page} нет вакансий.")
+                    logger.warning(f"No vacancies found on page {page}.")
                     break
 
-                logger.info(f"Обрабатываю страницу {page + 1}/{self.max_pages}...")
+                logger.info(f"Processing page {page + 1}/{self.max_pages}...")
                 self._process_vacancies(data["items"])
-                time.sleep(1)  # Задержка между запросами
+                time.sleep(1)  # Delay between requests
 
             except requests.exceptions.RequestException as e:
-                logger.error(f"Ошибка запроса: {e}")
+                logger.error(f"Request error: {e}")
                 break
 
     def _process_vacancies(self, vacancies_data: List[Dict]) -> None:
-        """Обработка сырых данных вакансий."""
+        """Process raw vacancy data"""
         for vacancy_data in vacancies_data:
             try:
-                # Получаем полное описание вакансии (если нужно)
                 full_info = requests.get(
                     f"{self.BASE_URL}/{vacancy_data['id']}",
                     headers=self.HEADERS,
@@ -86,11 +85,11 @@ class HHruParser:
                 self.found_vacancies.append(vacancy)
 
             except Exception as e:
-                logger.error(f"Ошибка обработки вакансии {vacancy_data.get('id')}: {e}")
+                logger.error(f"Error processing vacancy {vacancy_data.get('id')}: {e}")
 
     @staticmethod
     def _parse_salary(salary_data: Optional[Dict]) -> Optional[Dict[str, str]]:
-        """Форматирование зарплаты."""
+        """Format salary data"""
         if not salary_data:
             return None
         return {
@@ -101,7 +100,7 @@ class HHruParser:
         }
 
     def save_to_json(self, filename: str = "vacancies.json") -> None:
-        """Сохранение результатов в JSON."""
+        """Save results to JSON file"""
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(
                 [asdict(vacancy) for vacancy in self.found_vacancies],
@@ -109,18 +108,18 @@ class HHruParser:
                 ensure_ascii=False,
                 indent=4,
             )
-        logger.info(f"Данные сохранены в {filename}")
+        logger.info(f"Data saved to {filename}")
 
 if __name__ == "__main__":
-    parser = HHruParser(search_query="Python разработчик", max_pages=2)
+    parser = HHruParser(search_query="Python developer", max_pages=2)
     parser.fetch_vacancies()
     parser.save_to_json()
 
-    # Вывод статистики
-    print(f"\nНайдено вакансий: {len(parser.found_vacancies)}")
+    # Print stats
+    print(f"\nFound vacancies: {len(parser.found_vacancies)}")
     if parser.found_vacancies:
-        print("Пример вакансии:")
-        print(f"Название: {parser.found_vacancies[0].title}")
-        print(f"Компания: {parser.found_vacancies[0].company}")
-        print(f"Зарплата: {parser.found_vacancies[0].salary}")
-        print(f"Ссылка: {parser.found_vacancies[0].url}")
+        print("Example vacancy:")
+        print(f"Title: {parser.found_vacancies[0].title}")
+        print(f"Company: {parser.found_vacancies[0].company}")
+        print(f"Salary: {parser.found_vacancies[0].salary}")
+        print(f"URL: {parser.found_vacancies[0].url}")
